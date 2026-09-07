@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowUpRight, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleUserRound, Dumbbell, LayoutDashboard, Menu, Pencil, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowUpRight, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleUserRound, Dumbbell, LayoutDashboard, Menu, MoreVertical, Pencil, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import { useAuth } from './context/AuthContext'
 import { supabase } from './lib/supabase'
 import { useClientAreaData, type ClientAppointment } from './hooks/useClientAreaData'
@@ -151,6 +151,12 @@ function App() {
       <button className="wordmark" onClick={() => go('home')} aria-label="Torna alla home"><span className="wordmark-mark">O</span><span>Ocklan</span></button>
       <nav className={menuOpen ? 'main-nav is-open' : 'main-nav'} aria-label="Navigazione principale">
         <button onClick={() => goToSection('funzionalita')}>Funzionalità</button><button onClick={() => goToSection('come-funziona')}>Come funziona</button>
+        <div className="mobile-nav-actions">
+          {!user && <button className="ghost-button" onClick={() => { setMenuOpen(false); go('login') }}>Accedi</button>}
+          {user && <button className="ghost-button" onClick={() => { setMenuOpen(false); go(profile?.role === 'COACH' ? 'coach' : 'client') }}><CircleUserRound size={16} /> Area personale</button>}
+          {user && <button className="ghost-button" onClick={() => { setMenuOpen(false); void logout() }}>Esci</button>}
+          <button className="primary-button compact" onClick={() => { setMenuOpen(false); goToCoachRegistration() }}>Inizia gratis <ArrowUpRight size={16} /></button>
+        </div>
       </nav>
       <div className="header-actions">{user ? <><button className="ghost-button hide-mobile" onClick={() => go(profile?.role === 'COACH' ? 'coach' : 'client')}><CircleUserRound size={16} /> Area personale</button><button className="ghost-button hide-mobile" onClick={() => void logout()}>Esci</button></> : <button className="ghost-button hide-mobile" onClick={() => go('login')}>Accedi</button>}<button className="primary-button compact" onClick={goToCoachRegistration}>Inizia gratis <ArrowUpRight size={16} /></button><button className="icon-button mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Apri menu">{menuOpen ? <X size={21} /> : <Menu size={21} />}</button></div>
     </header>}
@@ -1474,6 +1480,14 @@ function CreateClientModal({ onClose, onCreated }: { onClose: () => void; onCrea
 function ServiceRow({ service, onEdit, onRefresh }: { service: ServiceRecord; onEdit: () => void; onRefresh: () => void }) {
   const { coachId } = useAuth()
   const [busy, setBusy] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
   const toggle = async () => {
     if (!coachId) return
     setBusy(true)
@@ -1481,7 +1495,7 @@ function ServiceRow({ service, onEdit, onRefresh }: { service: ServiceRecord; on
     setBusy(false)
     if (!result.error) onRefresh()
   }
-  return <div className={`service-management-row ${service.is_active ? '' : 'is-inactive'}`}><div><strong>{service.name}</strong>{service.description && <span>{service.description}</span>}<span>{(service.price_cents / 100).toFixed(2)} EUR · {service.duration_minutes} min{service.sessions_count !== null ? ` · ${service.sessions_count} sessioni` : ''}</span></div><div className="service-row-actions"><span className="status-pill">{service.is_active ? 'Attivo' : 'Non attivo'}</span><button className="ghost-button" onClick={onEdit}>Modifica</button><button className="ghost-button" disabled={busy} onClick={() => void toggle()}>{service.is_active ? 'Disattiva' : 'Attiva'}</button></div></div>
+  return <div className={`service-management-row ${service.is_active ? '' : 'is-inactive'}`}><div><strong>{service.name}</strong>{service.description && <span>{service.description}</span>}<span>{(service.price_cents / 100).toFixed(2)} EUR · {service.duration_minutes} min{service.sessions_count !== null ? ` · ${service.sessions_count} sessioni` : ''}</span></div><div className="service-row-actions"><span className="status-pill">{service.is_active ? 'Attivo' : 'Non attivo'}</span><button className="ghost-button" onClick={onEdit}>Modifica</button><button className="ghost-button" disabled={busy} onClick={() => void toggle()}>{service.is_active ? 'Disattiva' : 'Attiva'}</button><div className="service-overflow" ref={menuRef}><button className="service-overflow-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Azioni servizio"><MoreVertical size={18} /></button>{menuOpen && <div className="service-overflow-menu"><button onClick={() => { setMenuOpen(false); onEdit() }}>Modifica</button><button disabled={busy} onClick={() => { setMenuOpen(false); void toggle() }}>{service.is_active ? 'Disattiva' : 'Attiva'}</button></div>}</div></div></div>
 }
 
 function ServiceModal({ service, onClose, onSaved }: { service: ServiceRecord | null; onClose: () => void; onSaved: () => void }) {
