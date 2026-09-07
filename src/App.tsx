@@ -83,6 +83,14 @@ function App() {
   const [route, setRoute] = useState(() => routeFromPathname(window.location.pathname))
   const [routeHash, setRouteHash] = useState(() => window.location.hash)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const handler = (event: MouseEvent) => { if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) setMobileMenuOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [mobileMenuOpen])
   const [theme, setTheme] = useState<'dark' | 'light'>(() => (localStorage.getItem('gc-theme') as 'dark' | 'light' | null) ?? 'light')
   const privateRoute = ['client', 'coach', 'profile', 'client-detail', 'program-detail', 'client-program-detail', 'coach-page'].includes(route.view)
   const isCoachPublicRoute = route.view === 'coach-public'
@@ -125,6 +133,7 @@ function App() {
     window.history.pushState({}, '', paths[next])
     setRoute({ view: next })
     setMenuOpen(false)
+    setMobileMenuOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -161,7 +170,7 @@ function App() {
       <div className="header-actions">{user ? <><button className="ghost-button hide-mobile" onClick={() => go(profile?.role === 'COACH' ? 'coach' : 'client')}><CircleUserRound size={16} /> Area personale</button><button className="ghost-button hide-mobile" onClick={() => void logout()}>Esci</button></> : <button className="ghost-button hide-mobile" onClick={() => go('login')}>Accedi</button>}<button className="primary-button compact" onClick={goToCoachRegistration}>Inizia gratis <ArrowUpRight size={16} /></button><button className="icon-button mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Apri menu">{menuOpen ? <X size={21} /> : <Menu size={21} />}</button></div>
     </header>}
 
-    {privateRoute ? <div className="private-app-shell"><PrivateNavigation route={route.view} routeHash={routeHash} profile={profile} go={go} goToCoachAppointments={goToCoachAppointments} goToCoachClients={goToCoachClients} logout={logout} theme={theme} setTheme={setTheme} /><div className="private-app-content">{route.view === 'client' && <ClientArea go={go} />}{route.view === 'coach' && <CoachDashboard go={go} />}{route.view === 'profile' && <ProfilePage />}{route.view === 'coach-page' && <CoachPageSettings />}{route.view === 'client-detail' && <ClientDetailPage clientId={route.clientId} go={go} />}{route.view === 'program-detail' && <ProgramDetailPage clientId={route.clientId} programId={route.programId} />}{route.view === 'client-program-detail' && <ClientProgramDetailPage programId={route.programId} />}</div></div> : null}
+    {privateRoute ? <div className="private-app-shell"><div className="mobile-private-header" ref={mobileMenuRef}><button className="wordmark" onClick={() => go(profile?.role === 'COACH' ? 'coach' : 'client')} aria-label="Area personale"><span className="wordmark-mark">O</span><span>Ocklan</span></button><button className="icon-button mobile-menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Apri menu">{mobileMenuOpen ? <X size={21} /> : <Menu size={21} />}</button></div>{mobileMenuOpen && <nav className="mobile-private-nav is-open" aria-label="Navigazione area personale"><button className={route.view === (profile?.role === 'COACH' ? 'coach' : 'client') && routeHash !== '#appuntamenti' && routeHash !== '#clienti' ? 'is-active' : ''} onClick={() => { setMobileMenuOpen(false); go(profile?.role === 'COACH' ? 'coach' : 'client') }}><CircleUserRound size={17} /> Panoramica</button>{profile?.role === 'COACH' && <button className={route.view === 'coach' && routeHash === '#appuntamenti' ? 'is-active' : ''} onClick={() => { setMobileMenuOpen(false); goToCoachAppointments() }}><CalendarDays size={17} /> Appuntamenti</button>}{profile?.role === 'COACH' && <button className={route.view === 'coach' && routeHash === '#clienti' ? 'is-active' : ''} onClick={() => { setMobileMenuOpen(false); goToCoachClients() }}><Dumbbell size={17} /> Clienti</button>}{profile?.role === 'COACH' && <button className={route.view === 'coach-page' ? 'is-active' : ''} onClick={() => { setMobileMenuOpen(false); go('coach-page') }}><Sparkles size={17} /> Pagina pubblica</button>}{profile?.role === 'CLIENT' && <button className={route.view === 'client' ? 'is-active' : ''} onClick={() => { setMobileMenuOpen(false); go('client') }}><CalendarDays size={17} /> Appuntamenti</button>}<button className={route.view === 'profile' ? 'is-active' : ''} onClick={() => { setMobileMenuOpen(false); go('profile') }}><CircleUserRound size={17} /> Profilo</button><div className="mobile-nav-divider"></div><button className="theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? 'Modalità chiara' : 'Modalità scura'}</button><button className="ghost-button" onClick={() => { setMobileMenuOpen(false); void logout() }}>Esci</button></nav>}<PrivateNavigation route={route.view} routeHash={routeHash} profile={profile} go={go} goToCoachAppointments={goToCoachAppointments} goToCoachClients={goToCoachClients} logout={logout} theme={theme} setTheme={setTheme} /><div className="private-app-content">{route.view === 'client' && <ClientArea go={go} />}{route.view === 'coach' && <CoachDashboard go={go} />}{route.view === 'profile' && <ProfilePage />}{route.view === 'coach-page' && <CoachPageSettings />}{route.view === 'client-detail' && <ClientDetailPage clientId={route.clientId} go={go} />}{route.view === 'program-detail' && <ProgramDetailPage clientId={route.clientId} programId={route.programId} />}{route.view === 'client-program-detail' && <ClientProgramDetailPage programId={route.programId} />}</div></div> : null}
     {isOnboardingRoute && <OnboardingFlow go={go} coachPage={onboardingStatus} />}
     {!privateRoute && route.view === 'home' && <Home go={go} goToCoachRegistration={goToCoachRegistration} />}
     {!privateRoute && route.view === 'services' && <Services go={go} />}
