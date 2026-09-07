@@ -137,6 +137,7 @@
 .service-row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .service-row-actions .ghost-button { margin: 0; font-size: 11px; }
 .service-overflow { display: none; }
+.mobile-nav-actions { display: none; }
 .is-inactive { opacity: .65; }
 .checkbox-field { align-items: center; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--muted); cursor: pointer; display: flex; gap: 10px; min-height: 46px; padding: 10px 12px; transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease; }
 .checkbox-field:hover { border-color: var(--cyan); color: var(--white); transform: translateY(-1px); }
@@ -542,7 +543,6 @@ input[type='file']::file-selector-button:hover { border-color: var(--cyan); colo
 .site-header { backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 90%, transparent); }
 .main-nav { align-items: center; }
 .main-nav button { transition: color .2s ease; }
-.mobile-nav-actions { display: none; }
 .main-nav .nav-booking-link { color: var(--cyan); font-weight: 600; }
 .main-nav .nav-booking-link:hover { color: var(--white); }
 .home-hero { padding-bottom: clamp(88px, 11vw, 160px); }
