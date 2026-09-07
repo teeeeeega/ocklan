@@ -646,6 +646,48 @@ input[type='file']::file-selector-button:hover { border-color: var(--cyan); colo
 }
 @media (max-width: 620px) { .theme-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+/* Public page: mobile responsive */
+@media (max-width: 620px) {
+  .coach-public-page { padding: 0 0 48px; }
+  .coach-public-identity { margin-top: 32px; gap: 10px; padding: 0 16px; }
+  .coach-public-avatar { width: 80px; height: 80px; }
+  .coach-public-identity h1 { font-size: 24px; }
+  .coach-public-bio { font-size: 14px; }
+  .coach-public-services { padding: 28px 16px 0; }
+  .coach-public-service-grid { grid-template-columns: 1fr; gap: 12px; }
+  .coach-public-service-card { padding: 16px; }
+  .coach-public-cta { width: 100%; justify-content: center; min-height: 48px; }
+  .coach-public-socials-section { padding: 20px 16px 0; }
+  .coach-public-footer { padding: 32px 16px 0; }
+  .coach-public-missing { min-height: 50vh; padding: 0 16px; }
+}
+
+/* Booking page: full-width theme and mobile responsive */
+.public-booking-page { background: var(--bg); color: var(--white); max-width: none; }
+.public-booking-page .back-link { color: var(--muted); }
+.public-booking-page .back-link:hover { color: var(--white); }
+.public-booking-page .page-heading h1 { color: var(--white); }
+.public-booking-page .page-heading p { color: var(--muted); }
+.public-booking-page .panel { background: var(--panel); border-color: var(--line); }
+.public-booking-page .form-label { color: var(--muted); }
+.public-booking-page .muted { color: var(--muted); }
+.public-booking-page .booking-service-info { background: var(--panel-2); border-color: var(--line); color: var(--muted); }
+.public-booking-page .slot-button { background: var(--panel); border-color: var(--line); color: var(--white); }
+.public-booking-page .slot-button:hover, .public-booking-page .slot-button.is-selected { border-color: var(--accent); color: var(--accent); }
+.public-booking-page .calendar-day { color: var(--white); }
+.public-booking-page .calendar-day:disabled { color: var(--muted); }
+.public-booking-page .booking-summary { border-color: var(--line); background: var(--panel); }
+.public-booking-page .booking-summary > span:not(.eyebrow) { color: var(--muted); }
+.public-booking-page .form-error { color: #ff9f9f; }
+@media (max-width: 620px) {
+  .public-booking-page { padding: 44px 16px 48px; }
+  .public-booking-page .page-heading h1 { font-size: clamp(32px, 10vw, 48px); }
+  .public-booking-page .booking-panel { padding: 16px; }
+  .public-booking-page .slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-booking-page .booking-summary .primary-button { width: 100%; justify-content: center; }
+  .public-booking-page select { min-height: 48px; }
+}
+
 /* Coach page settings avatar upload (Step 4B redesign) */
 .coach-page-avatar-picker { display: flex; justify-content: center; margin-bottom: 8px; }
 .coach-page-avatar-button { position: relative; width: 96px; height: 96px; border-radius: 999px; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--panel-2); border: 2px solid var(--line); }

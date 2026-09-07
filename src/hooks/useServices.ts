@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
 export type ServiceRecord = {
   id: string
+  coach_id: string | null
   name: string
   description: string
   price_cents: number
@@ -16,7 +18,10 @@ export type ServiceRecord = {
   created_at: string
 }
 
-export function useServices(enabled: boolean, activeOnly = false) {
+const SERVICE_COLUMNS = 'id, coach_id, name, description, price_cents, billing_type, duration_minutes, sessions_count, pathway_days, requires_intro_call, appointment_type, is_active, created_at'
+
+export function useServices(enabled: boolean, activeOnly = false, coachScoped = false, filterCoachId?: string | null) {
+  const { coachId } = useAuth()
   const [services, setServices] = useState<ServiceRecord[]>([])
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
@@ -24,23 +29,39 @@ export function useServices(enabled: boolean, activeOnly = false) {
 
   useEffect(() => {
     let active = true
-    if (!enabled) return () => { active = false }
+    if (!enabled) {
+      setLoading(false)
+      setServices([])
+      setError(null)
+      return () => { active = false }
+    }
+    if (coachScoped && !coachId) {
+      setLoading(false)
+      setServices([])
+      setError(null)
+      return () => { active = false }
+    }
     const load = async () => {
       setLoading(true)
-      let query = supabase.from('services').select('id, name, description, price_cents, billing_type, duration_minutes, sessions_count, pathway_days, requires_intro_call, appointment_type, is_active, created_at')
+      let query = supabase.from('services').select(SERVICE_COLUMNS)
+      const effectiveCoachId = filterCoachId ?? (coachScoped ? coachId : null)
+      if (effectiveCoachId) query = query.eq('coach_id', effectiveCoachId)
       if (activeOnly) query = query.eq('is_active', true)
       const result = await query.order('created_at', { ascending: false })
       if (!active) return
-      if (result.error) setError('Non è stato possibile caricare i servizi.')
-      else {
+      if (result.error) {
+        setError('Non è stato possibile caricare i servizi.')
+        setServices([])
+      } else {
         setError(null)
-        setServices(result.data ?? [])
+        const rows = (result.data ?? []) as ServiceRecord[]
+        setServices(effectiveCoachId ? rows.filter((row) => row.coach_id === effectiveCoachId) : rows)
       }
       setLoading(false)
     }
     void load()
     return () => { active = false }
-  }, [activeOnly, enabled, refreshToken])
+  }, [activeOnly, coachId, coachScoped, enabled, filterCoachId, refreshToken])
 
   return { services, loading, error, refresh: () => setRefreshToken((value) => value + 1) }
 }

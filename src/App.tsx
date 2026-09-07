@@ -332,13 +332,15 @@ function Services({ go }: { go: (view: View) => void }) {
 function Booking({ go }: { go: (view: View) => void }) {
   const rawPending = localStorage.getItem('pending-booking')
   let publicTheme: PublicPageTheme | null = null
+  let coachSlug: string | null = null
   try {
-    const pending = rawPending ? JSON.parse(rawPending) as { theme?: PublicPageTheme } : null
+    const pending = rawPending ? JSON.parse(rawPending) as { theme?: PublicPageTheme; coachSlug?: string } : null
     publicTheme = pending?.theme && PUBLIC_PAGE_THEMES.includes(pending.theme) ? pending.theme : null
+    coachSlug = pending?.coachSlug ?? null
   } catch {
     // The booking flow handles malformed pending state separately.
   }
-  return <main className={`app-page narrow-page${publicTheme ? ` public-booking-page public-theme-${publicTheme}` : ''}`}><button className="back-link" onClick={() => go('services')}><ChevronRight size={16} className="rotate" /> Torna ai percorsi</button><div className="page-heading"><div className="eyebrow">Prenota il primo passo</div><h1>Scegli il tuo<br /><em>appuntamento.</em></h1><p>Seleziona un servizio, un giorno e un orario realmente disponibile.</p></div><ClientBookingSection go={go} onBooked={() => undefined} /></main>
+  return <main className={`app-page narrow-page${publicTheme ? ` public-booking-page public-theme-${publicTheme}` : ''}`}><button className="back-link" onClick={() => coachSlug ? navigateToPath(`/${coachSlug}`) : go('services')}><ChevronRight size={16} className="rotate" /> {coachSlug ? 'Torna al profilo' : 'Torna ai percorsi'}</button><div className="page-heading"><div className="eyebrow">Prenota il primo passo</div><h1>Scegli il tuo<br /><em>appuntamento.</em></h1><p>Seleziona un servizio, un giorno e un orario realmente disponibile.</p></div><ClientBookingSection go={go} onBooked={() => undefined} /></main>
 }
 
 const PUBLIC_SOCIAL_ICONS: { key: keyof SocialLinks; label: string; Icon: typeof Instagram }[] = [
@@ -356,7 +358,7 @@ function CoachPublicPage({ slug }: { slug: string }) {
   }, [])
 
   const startBooking = (serviceId?: string) => {
-    localStorage.setItem('pending-booking', JSON.stringify({ coachSlug: slug, theme: page?.theme, ...(serviceId ? { serviceId } : {}) }))
+    localStorage.setItem('pending-booking', JSON.stringify({ coachSlug: slug, coachId: page?.coach_id, theme: page?.theme, ...(serviceId ? { serviceId } : {}) }))
     navigateToPath('/contatti')
   }
 
@@ -424,7 +426,7 @@ const ONBOARDING_STORAGE_KEY_PREFIX = 'coachplatform-onboarding-step:'
 function OnboardingFlow({ go, coachPage }: { go: (view: View) => void; coachPage: ReturnType<typeof useCoachPage> }) {
   const { profile } = useAuth()
   const { page, loading, save, uploadAvatar, refresh } = coachPage
-  const servicesData = useServices(profile?.role === 'COACH')
+  const servicesData = useServices(profile?.role === 'COACH', false, true)
   const onboardingStorageKey = profile?.id ? `${ONBOARDING_STORAGE_KEY_PREFIX}${profile.id}` : null
 
   const [stepIndex, setStepIndex] = useState(() => {
@@ -819,7 +821,7 @@ function CoachPageAvatarPicker({ avatarUrl, displayName, onPick, busy }: { avata
 function CoachPageSettings() {
   const { profile, coachId } = useAuth()
   const { page, loading, error: loadError, save, saveTheme, uploadAvatar, refresh } = useCoachPage(profile?.role === 'COACH', coachId)
-  const servicesData = useServices(profile?.role === 'COACH')
+  const servicesData = useServices(profile?.role === 'COACH', false, true)
 
   const [displayName, setDisplayName] = useState('')
   const [slug, setSlug] = useState('')
@@ -1005,7 +1007,9 @@ function calendarDays(month: Date) {
 
 function ClientBookingSection({ go, onBooked }: { go?: (view: View) => void; onBooked: () => void }) {
   const { user } = useAuth()
-  const { services, loading: servicesLoading, error: servicesError } = useServices(true, true)
+  const [coachSlug, setCoachSlug] = useState<string | null>(null)
+  const [filterCoachId, setFilterCoachId] = useState<string | null>(null)
+  const { services, loading: servicesLoading, error: servicesError } = useServices(true, true, false, filterCoachId)
   const [serviceId, setServiceId] = useState('')
   const [date, setDate] = useState(localDateValue)
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null)
@@ -1017,6 +1021,18 @@ function ClientBookingSection({ go, onBooked }: { go?: (view: View) => void; onB
   const { slots, loading: slotsLoading, error: slotsError, refresh: refreshSlots } = useAvailability(serviceId, date)
   const { book, loading: bookingLoading, error: bookingError } = useBooking()
   const service = services.find((item) => item.id === serviceId)
+
+  useEffect(() => {
+    const raw = localStorage.getItem('pending-booking')
+    if (!raw) return
+    try {
+      const pending = JSON.parse(raw) as { serviceId?: string; date?: string; slot?: AvailableSlot; coachSlug?: string; coachId?: string }
+      if (pending.coachSlug) setCoachSlug(pending.coachSlug)
+      if (pending.coachId) setFilterCoachId(pending.coachId)
+    } catch {
+      // Malformed pending booking; will be handled by service restoration below.
+    }
+  }, [])
 
   useEffect(() => {
     const raw = localStorage.getItem('pending-booking')
@@ -1047,18 +1063,20 @@ function ClientBookingSection({ go, onBooked }: { go?: (view: View) => void; onB
     if (!service || !selectedSlot || bookingLoading) return
     if (!user) {
       const rawPending = localStorage.getItem('pending-booking')
-      let coachSlug: string | undefined
-      let theme: PublicPageTheme | undefined
+      let existingCoachSlug: string | undefined
+      let existingTheme: PublicPageTheme | undefined
+      let existingCoachId: string | undefined
       if (rawPending) {
         try {
-          const pending = JSON.parse(rawPending) as { coachSlug?: string; theme?: PublicPageTheme }
-          coachSlug = pending.coachSlug
-          theme = pending.theme
+          const pending = JSON.parse(rawPending) as { coachSlug?: string; theme?: PublicPageTheme; coachId?: string }
+          existingCoachSlug = pending.coachSlug
+          existingTheme = pending.theme
+          existingCoachId = pending.coachId
         } catch {
           // A malformed pending booking cannot provide a coach context.
         }
       }
-      localStorage.setItem('pending-booking', JSON.stringify({ serviceId, date, slot: selectedSlot, ...(coachSlug ? { coachSlug } : {}), ...(theme ? { theme } : {}) }))
+      localStorage.setItem('pending-booking', JSON.stringify({ serviceId, date, slot: selectedSlot, ...(existingCoachSlug ? { coachSlug: existingCoachSlug } : {}), ...(existingTheme ? { theme: existingTheme } : {}), ...(existingCoachId ? { coachId: existingCoachId } : {}) }))
       go?.('login')
       return
     }
@@ -1100,7 +1118,7 @@ function ClientBookingSection({ go, onBooked }: { go?: (view: View) => void; onB
           <span>{formatTime(confirmed.starts_at)} - {formatTime(confirmed.ends_at)}</span>
         </div>
         <div className="booking-confirmation-actions">
-          <button type="button" className="primary-button" onClick={() => { setConfirmed(null); go?.('client') }}>Vai alla mia area <ArrowUpRight size={16} /></button>
+          {coachSlug ? <button type="button" className="primary-button" onClick={() => { setConfirmed(null); navigateToPath(`/${coachSlug}`) }}>Torna al profilo <ArrowUpRight size={16} /></button> : <button type="button" className="primary-button" onClick={() => { setConfirmed(null); go?.('client') }}>Vai alla mia area <ArrowUpRight size={16} /></button>}
           <button type="button" className="ghost-button" onClick={() => setConfirmed(null)}>Chiudi</button>
         </div>
       </section>
@@ -1333,7 +1351,7 @@ function CoachAvailabilitySection() {
 function CoachDashboard({ go }: { go: (view: View) => void }) {
   const { profile } = useAuth()
   const { clients, programs, loading, error, refresh } = useCoachDashboardData(profile?.role === 'COACH')
-  const servicesData = useServices(profile?.role === 'COACH')
+  const servicesData = useServices(profile?.role === 'COACH', false, true)
   const materialsData = useMaterials({ enabled: profile?.role === 'COACH' })
   const paymentsData = usePayments({ enabled: profile?.role === 'COACH' })
   const contactData = useContactRequests(profile?.role === 'COACH')
@@ -1454,10 +1472,12 @@ function CreateClientModal({ onClose, onCreated }: { onClose: () => void; onCrea
 }
 
 function ServiceRow({ service, onEdit, onRefresh }: { service: ServiceRecord; onEdit: () => void; onRefresh: () => void }) {
+  const { coachId } = useAuth()
   const [busy, setBusy] = useState(false)
   const toggle = async () => {
+    if (!coachId) return
     setBusy(true)
-    const result = await supabase.from('services').update({ is_active: !service.is_active }).eq('id', service.id)
+    const result = await supabase.from('services').update({ is_active: !service.is_active }).eq('id', service.id).eq('coach_id', coachId)
     setBusy(false)
     if (!result.error) onRefresh()
   }
@@ -1501,7 +1521,7 @@ function ServiceModal({ service, onClose, onSaved }: { service: ServiceRecord | 
     }
     const payload = { name: name.trim(), description: description.trim(), price_cents: Math.round(priceNumber * 100), billing_type: billingType, duration_minutes: duration ? Number(duration) : 0, sessions_count: sessions ? Number(sessions) : null, pathway_days: pathwayDays ? Number(pathwayDays) : null, requires_intro_call: intro, appointment_type: appointmentType.trim() || null, is_active: active }
     const result = service
-      ? await supabase.from('services').update(payload).eq('id', service.id)
+      ? await supabase.from('services').update(payload).eq('id', service.id).eq('coach_id', coachId)
       : await supabase.from('services').insert({ coach_id: coachId, ...payload })
     setBusy(false)
     if (result.error) { setError('Non è stato possibile salvare il servizio.'); return }
@@ -1609,7 +1629,7 @@ function PaymentRow({ payment, showClient, onEdit }: { payment: PaymentRecord; s
 
 function PaymentModal({ payment, clients, initialClientId, onClose, onSaved }: { payment: PaymentRecord | null; clients: { id: string; full_name: string }[]; initialClientId?: string; onClose: () => void; onSaved: () => void }) {
   const { coachId } = useAuth()
-  const servicesData = useServices(true)
+  const servicesData = useServices(true, false, true)
   const [clientId, setClientId] = useState(payment?.client_id ?? initialClientId ?? '')
   const [serviceId, setServiceId] = useState(payment?.service_id ?? '')
   const [appointmentId, setAppointmentId] = useState(payment?.appointment_id ?? '')
@@ -1696,7 +1716,11 @@ function CreateAppointmentModal({ clients, onClose, onCreated }: { clients: { id
 
   useEffect(() => {
     let active = true
-    void supabase.from('services').select('id, name').eq('is_active', true).order('name').then(({ data, error: queryError }) => {
+    if (!coachId) {
+      setServices([])
+      return () => { active = false }
+    }
+    void supabase.from('services').select('id, name').eq('coach_id', coachId).eq('is_active', true).order('name').then(({ data, error: queryError }) => {
       if (!active) return
       if (queryError) setError('Non è stato possibile caricare i servizi.')
       else setServices(data ?? [])
@@ -1706,7 +1730,7 @@ function CreateAppointmentModal({ clients, onClose, onCreated }: { clients: { id
     }
     window.addEventListener('keydown', onKeyDown)
     return () => { active = false; window.removeEventListener('keydown', onKeyDown) }
-  }, [busy, onClose])
+  }, [busy, coachId, onClose])
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1796,7 +1820,7 @@ type EditableAppointment = {
 }
 
 function AppointmentEditModal({ appointment, onClose, onSaved }: { appointment: EditableAppointment; onClose: () => void; onSaved: () => void }) {
-  const { services, loading: servicesLoading } = useServices(true)
+  const { services, loading: servicesLoading } = useServices(true, false, true)
   const initialStart = new Date(appointment.starts_at)
   const [date, setDate] = useState(initialStart.toISOString().slice(0, 10))
   const [time, setTime] = useState(initialStart.toTimeString().slice(0, 5))
@@ -1916,7 +1940,12 @@ function CreateProgramModal({ clientId, onClose, onCreated }: { clientId: string
   useEffect(() => {
     let active = true
     const loadServices = async () => {
-      const result = await supabase.from('services').select('id, name').eq('is_active', true).order('name', { ascending: true })
+      if (!coachId) {
+        setServices([])
+        setServicesLoading(false)
+        return
+      }
+      const result = await supabase.from('services').select('id, name').eq('coach_id', coachId).eq('is_active', true).order('name', { ascending: true })
       if (!active) return
       if (result.error) setServicesError('Non è stato possibile caricare i servizi.')
       else setServices(result.data ?? [])
@@ -1924,7 +1953,7 @@ function CreateProgramModal({ clientId, onClose, onCreated }: { clientId: string
     }
     void loadServices()
     return () => { active = false }
-  }, [])
+  }, [coachId])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2265,7 +2294,7 @@ function DetailPackage({ item, onEdit, onRefresh }: { item: ClientDetailPackage;
 
 function PackageModal({ clientId, packageItem, onClose, onSaved }: { clientId: string; packageItem: ClientDetailPackage | null; onClose: () => void; onSaved: () => void }) {
   const { coachId } = useAuth()
-  const { services, loading: servicesLoading } = useServices(true)
+  const { services, loading: servicesLoading } = useServices(true, false, true)
   const [serviceId, setServiceId] = useState(packageItem?.service_id ?? '')
   const [total, setTotal] = useState(packageItem?.total_sessions.toString() ?? '')
   const [used, setUsed] = useState(packageItem?.used_sessions.toString() ?? '0')

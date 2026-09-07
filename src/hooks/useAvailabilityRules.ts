@@ -27,7 +27,8 @@ export function useAvailabilityRules(enabled: boolean) {
     const load = async () => {
       setLoading(true)
       setError(null)
-      const result = await supabase.from('availability_rules').select('id, weekday, starts_at, ends_at, slot_minutes, is_active').order('weekday', { ascending: true })
+      const query = supabase.from('availability_rules').select('id, weekday, starts_at, ends_at, slot_minutes, is_active').order('weekday', { ascending: true })
+      const result = coachId ? await query.eq('coach_id', coachId) : await query
       if (!active) return
       if (result.error) {
         setError('Non è stato possibile caricare le disponibilità.')
