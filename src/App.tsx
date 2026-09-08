@@ -1504,7 +1504,23 @@ function ServiceRow({ service, onEdit, onRefresh }: { service: ServiceRecord; on
     setBusy(false)
     if (!result.error) onRefresh()
   }
-  return <div className={`service-management-row ${service.is_active ? '' : 'is-inactive'}`}><div><strong>{service.name}</strong>{service.description && <span>{service.description}</span>}<span>{(service.price_cents / 100).toFixed(2)} EUR · {service.duration_minutes} min{service.sessions_count !== null ? ` · ${service.sessions_count} sessioni` : ''}</span></div><div className="service-row-actions"><span className="status-pill">{service.is_active ? 'Attivo' : 'Non attivo'}</span><button className="ghost-button" onClick={onEdit}>Modifica</button><button className="ghost-button" disabled={busy} onClick={() => void toggle()}>{service.is_active ? 'Disattiva' : 'Attiva'}</button><div className="service-overflow" ref={menuRef}><button className="service-overflow-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Azioni servizio"><MoreVertical size={18} /></button>{menuOpen && <div className="service-overflow-menu"><button onClick={() => { setMenuOpen(false); onEdit() }}>Modifica</button><button disabled={busy} onClick={() => { setMenuOpen(false); void toggle() }}>{service.is_active ? 'Disattiva' : 'Attiva'}</button></div>}</div></div></div>
+  const remove = async () => {
+    if (!coachId) return
+    if (!window.confirm('Sei sicuro di voler eliminare questo servizio? L\'operazione è permanente.')) return
+    setBusy(true)
+    const result = await supabase.from('services').delete().eq('id', service.id).eq('coach_id', coachId)
+    setBusy(false)
+    if (result.error) {
+      if (result.error.message.includes('foreign key') || result.error.message.includes('violates') || result.error.code === '23503') {
+        window.alert('Impossibile eliminare questo servizio perché è associato a dati esistenti. Disattivalo invece per conservarne lo storico.')
+      } else {
+        window.alert('Si è verificato un errore durante l\'eliminazione del servizio.')
+      }
+      return
+    }
+    onRefresh()
+  }
+  return <div className={`service-management-row ${service.is_active ? '' : 'is-inactive'}`}><div><strong>{service.name}</strong>{service.description && <span>{service.description}</span>}<span>{(service.price_cents / 100).toFixed(2)} EUR · {service.duration_minutes} min{service.sessions_count !== null ? ` · ${service.sessions_count} sessioni` : ''}</span></div><div className="service-row-actions"><span className="status-pill">{service.is_active ? 'Attivo' : 'Non attivo'}</span><button className="ghost-button" onClick={onEdit}>Modifica</button><button className="ghost-button" disabled={busy} onClick={() => void toggle()}>{service.is_active ? 'Disattiva' : 'Attiva'}</button><button className="ghost-button danger-button" disabled={busy} onClick={() => void remove()}>Elimina</button><div className="service-overflow" ref={menuRef}><button className="service-overflow-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Azioni servizio"><MoreVertical size={18} /></button>{menuOpen && <div className="service-overflow-menu"><button onClick={() => { setMenuOpen(false); onEdit() }}>Modifica</button><button disabled={busy} onClick={() => { setMenuOpen(false); void toggle() }}>{service.is_active ? 'Disattiva' : 'Attiva'}</button><button className="danger-button" disabled={busy} onClick={() => { setMenuOpen(false); void remove() }}>Elimina</button></div>}</div></div></div>
 }
 
 function ServiceModal({ service, onClose, onSaved }: { service: ServiceRecord | null; onClose: () => void; onSaved: () => void }) {
