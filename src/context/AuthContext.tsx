@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data.requested_role = 'client'
         if (intent && 'coachSlug' in intent && intent.coachSlug) data.coach_slug = intent.coachSlug
       }
-      const result = await supabase.auth.signUp({ email, password, options: { data } })
+      const result = await supabase.auth.signUp({ email, password, options: { data, emailRedirectTo: window.location.origin } })
       if (result.error) setAuthError(result.error.message)
       return { error: result.error, needsConfirmation: !result.error && !result.data.session }
     },
