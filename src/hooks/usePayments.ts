@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 export const paymentStatuses = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'] as const
 export type PaymentStatus = typeof paymentStatuses[number]
@@ -25,6 +26,7 @@ export type PaymentRecord = {
 
 export function usePayments(options: { clientId?: string; enabled?: boolean } = {}) {
   const { clientId, enabled = true } = options
+  const { coachId } = useAuth()
   const [payments, setPayments] = useState<PaymentRecord[]>([])
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +47,7 @@ export function usePayments(options: { clientId?: string; enabled?: boolean } = 
         .from('payments')
         .select('id, client_id, service_id, appointment_id, amount_cents, status, provider, provider_reference, created_at, client:profiles!payments_client_id_fkey(full_name), service:services(name), appointment:appointments!payments_appointment_id_fkey(starts_at, ends_at, service:services(name))')
         .order('created_at', { ascending: false })
+      if (coachId) query = query.eq('coach_id', coachId)
       if (clientId) query = query.eq('client_id', clientId)
       const result = await query
       if (!active) return
@@ -64,7 +67,7 @@ export function usePayments(options: { clientId?: string; enabled?: boolean } = 
 
     void load()
     return () => { active = false }
-  }, [clientId, enabled, refreshToken])
+  }, [clientId, enabled, refreshToken, coachId])
 
   return { payments, loading, error, refresh: () => setRefreshToken((value) => value + 1) }
 }

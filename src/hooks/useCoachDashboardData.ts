@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 export type CoachClient = {
   id: string
@@ -30,6 +31,7 @@ type CoachDashboardData = {
 }
 
 export function useCoachDashboardData(enabled: boolean): CoachDashboardData {
+  const { coachId } = useAuth()
   const [data, setData] = useState<Omit<CoachDashboardData, 'loading' | 'error' | 'refresh'>>({
     clients: [],
     programs: [],
@@ -50,11 +52,40 @@ export function useCoachDashboardData(enabled: boolean): CoachDashboardData {
     const load = async () => {
       setLoading(true)
       setError(null)
+
+      if (!coachId) {
+        setData({ clients: [], programs: [] })
+        setLoading(false)
+        return
+      }
+
+      const { data: relationships, error: relError } = await supabase
+        .from('coach_clients')
+        .select('client_id')
+        .eq('coach_id', coachId)
+        .eq('status', 'ACTIVE')
+
+      if (!active) return
+      if (relError || !relationships?.length) {
+        if (relError) setError(`Non è stato possibile caricare i dati del gestionale: ${relError.message}`)
+        setData({ clients: [], programs: [] })
+        setLoading(false)
+        return
+      }
+
+      const clientIds = relationships.map((r) => r.client_id)
+
       const [clientsResult, programsResult] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, avatar_url, created_at').eq('role', 'CLIENT').order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, created_at')
+          .in('id', clientIds)
+          .eq('role', 'CLIENT')
+          .order('created_at', { ascending: false }),
         supabase
           .from('client_programs')
           .select('id, client_id, title, status, goal, starts_at, ends_at, client:profiles!client_programs_client_id_fkey(full_name), service:services(name)')
+          .eq('coach_id', coachId)
           .order('starts_at', { ascending: true, nullsFirst: false }),
       ])
 
@@ -88,7 +119,7 @@ export function useCoachDashboardData(enabled: boolean): CoachDashboardData {
     return () => {
       active = false
     }
-  }, [enabled, refreshToken])
+  }, [enabled, refreshToken, coachId])
 
   return { ...data, loading, error, refresh: () => setRefreshToken((value) => value + 1) }
 }

@@ -25,7 +25,12 @@ export function useBlockedTimes(enabled: boolean) {
     const load = async () => {
       setLoading(true)
       setError(null)
-      const result = await supabase.from('blocked_times').select('id, starts_at, ends_at, reason').gte('ends_at', new Date().toISOString()).order('starts_at', { ascending: true })
+      if (!coachId) {
+        setBlockedTimes([])
+        setLoading(false)
+        return
+      }
+      const result = await supabase.from('blocked_times').select('id, starts_at, ends_at, reason').eq('coach_id', coachId).gte('ends_at', new Date().toISOString()).order('starts_at', { ascending: true })
       if (!active) return
       if (result.error) {
         setError('Non è stato possibile caricare i periodi non disponibili.')
@@ -37,7 +42,7 @@ export function useBlockedTimes(enabled: boolean) {
     }
     void load()
     return () => { active = false }
-  }, [enabled, refreshToken])
+  }, [enabled, refreshToken, coachId])
 
   const create = (startsAt: string, endsAt: string, reason: string) =>
     coachId

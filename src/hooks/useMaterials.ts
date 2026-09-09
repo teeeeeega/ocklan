@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 export type MaterialRecord = {
   id: string
@@ -23,6 +24,7 @@ type MaterialsData = {
 
 export function useMaterials(options: { clientId?: string; enabled?: boolean; activeOnly?: boolean } = {}): MaterialsData {
   const { clientId, enabled = true, activeOnly = false } = options
+  const { coachId } = useAuth()
   const [materials, setMaterials] = useState<MaterialRecord[]>([])
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +42,7 @@ export function useMaterials(options: { clientId?: string; enabled?: boolean; ac
       setLoading(true)
       setError(null)
       let query = supabase.from('materials').select('id, client_id, title, description, url, material_type, is_active, created_at').order('created_at', { ascending: false })
+      if (coachId) query = query.eq('coach_id', coachId)
       if (clientId) query = query.eq('client_id', clientId)
       if (activeOnly) query = query.eq('is_active', true)
       const result = await query
@@ -61,7 +64,7 @@ export function useMaterials(options: { clientId?: string; enabled?: boolean; ac
 
     void load()
     return () => { active = false }
-  }, [activeOnly, clientId, enabled, options.clientId, refreshToken])
+  }, [activeOnly, clientId, enabled, options.clientId, refreshToken, coachId])
 
   const uploadFile = async (file: File, targetClientId: string) => {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
