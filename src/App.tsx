@@ -824,7 +824,7 @@ function ProfilePage() {
     const { error: deleteErr } = await deleteAccount()
     setDeleteBusy(false)
     if (deleteErr) {
-      setDeleteError(deleteErr.message || 'Non è stato possibile eliminare l'account. Puoi riprovare.')
+      setDeleteError(deleteErr.message || "Non è stato possibile eliminare l'account. Puoi riprovare.")
       return
     }
     await logout()
