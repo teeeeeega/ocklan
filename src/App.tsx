@@ -730,7 +730,7 @@ function suggestSlug(name: string): string {
 }
 
 function ProfilePage() {
-  const { user, profile, updateProfile, logout } = useAuth()
+  const { user, profile, updateProfile, deleteAccount, logout } = useAuth()
   const [name, setName] = useState(profile?.full_name ?? '')
   const [avatarPath, setAvatarPath] = useState(profile?.avatar_url ?? '')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -739,6 +739,10 @@ function ProfilePage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     setName(profile?.full_name ?? '')
@@ -813,7 +817,21 @@ function ProfilePage() {
     setMessage('Profilo aggiornato correttamente.')
   }
 
-  return <main className="app-page profile-page"><div className="page-heading"><div className="eyebrow">Account personale</div><h1>Il tuo<br /><em>profilo.</em></h1><p>Gestisci il nome e l’immagine che utilizzi nella tua area personale.</p></div><section className="panel profile-card"><div className="profile-avatar-block">{avatarUrl ? <img className="profile-avatar" src={avatarUrl} alt={`Avatar di ${name || 'utente'}`} /> : <span className="profile-avatar profile-avatar-placeholder">{initials(name)}</span>}<label className="ghost-button profile-file-button">Scegli immagine<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => selectFile(event.target.files?.[0])} /></label>{(avatarPath || file) && <button type="button" className="text-button profile-remove-button" onClick={() => { setRemoveAvatar(true); setFile(null); setAvatarUrl(null); setMessage(null) }}>Rimuovi immagine</button>}<small>JPG, PNG, WEBP o GIF · massimo 5 MB</small></div><div className="profile-form"><label>Nome e cognome<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label><label>Email<input value={user?.email ?? ''} disabled /></label>{error && <p className="form-error" role="alert">{error}</p>}{message && <p className="form-message" role="status">{message}</p>}<div className="profile-actions"><button className="primary-button" onClick={() => void save()} disabled={busy}>{busy ? 'Salvataggio...' : 'Salva profilo'} <ArrowUpRight size={17} /></button><button className="ghost-button" onClick={() => void logout()}>Esci dall’account</button></div></div></section></main>
+  const handleDeleteAccount = async () => {
+    if (deleteBusy || deleteConfirmText !== 'ELIMINA') return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    const { error: deleteErr } = await deleteAccount()
+    setDeleteBusy(false)
+    if (deleteErr) {
+      setDeleteError(deleteErr.message || 'Non è stato possibile eliminare l'account. Puoi riprovare.')
+      return
+    }
+    await logout()
+    window.location.href = '/'
+  }
+
+  return <main className="app-page profile-page"><div className="page-heading"><div className="eyebrow">Account personale</div><h1>Il tuo<br /><em>profilo.</em></h1><p>Gestisci il nome e l'immagine che utilizzi nella tua area personale.</p></div><section className="panel profile-card"><div className="profile-avatar-block">{avatarUrl ? <img className="profile-avatar" src={avatarUrl} alt={`Avatar di ${name || 'utente'}`} /> : <span className="profile-avatar profile-avatar-placeholder">{initials(name)}</span>}<label className="ghost-button profile-file-button">Scegli immagine<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => selectFile(event.target.files?.[0])} /></label>{(avatarPath || file) && <button type="button" className="text-button profile-remove-button" onClick={() => { setRemoveAvatar(true); setFile(null); setAvatarUrl(null); setMessage(null) }}>Rimuovi immagine</button>}<small>JPG, PNG, WEBP o GIF · massimo 5 MB</small></div><div className="profile-form"><label>Nome e cognome<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label><label>Email<input value={user?.email ?? ''} disabled /></label>{error && <p className="form-error" role="alert">{error}</p>}{message && <p className="form-message" role="status">{message}</p>}<div className="profile-actions"><button className="primary-button" onClick={() => void save()} disabled={busy}>{busy ? 'Salvataggio...' : 'Salva profilo'} <ArrowUpRight size={17} /></button><button className="ghost-button" onClick={() => void logout()}>Esci dall'account</button></div></div></section><section className="panel" style={{ marginTop: 24, padding: 24 }}><h2 style={{ fontSize: 18, marginBottom: 12 }}>Elimina account</h2><p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>Questa operazione è permanente e non può essere annullata. Tutti i tuoi dati verranno eliminati.</p><button className="ghost-button danger-button" onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError(null) }}>Elimina account</button></section>{showDeleteModal && <div className="modal-overlay" onClick={() => { if (!deleteBusy) setShowDeleteModal(false) }}><div className="modal-card" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 420 }}><h2 style={{ fontSize: 20, marginBottom: 12 }}>Conferma eliminazione</h2><p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>Questa operazione è permanente e non può essere annullata. I dati dello storico del coach saranno preservati ma scollegati dal tuo account.</p><label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Per confermare, scrivi <strong style={{ color: 'var(--white)' }}>ELIMINA</strong> nel campo sottostante:</label><input type="text" value={deleteConfirmText} onChange={(event) => setDeleteConfirmText(event.target.value)} disabled={deleteBusy} style={{ width: '100%', padding: '10px 12px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 'var(--radius-control)', color: 'var(--white)', fontSize: 14, marginBottom: 16, boxSizing: 'border-box' }} placeholder="ELIMINA" autoComplete="off" />{deleteError && <p className="form-error" role="alert" style={{ marginBottom: 12 }}>{deleteError}</p>}<div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}><button className="ghost-button" onClick={() => { if (!deleteBusy) setShowDeleteModal(false) }} disabled={deleteBusy}>Annulla</button><button className="primary-button danger-button" onClick={() => void handleDeleteAccount()} disabled={deleteBusy || deleteConfirmText !== 'ELIMINA'}>{deleteBusy ? 'Eliminazione...' : 'Conferma elimina'}</button></div></div></div>}</main>
 }
 
 const SOCIAL_LINK_FIELDS: { key: keyof SocialLinks; label: string; placeholder: string }[] = [

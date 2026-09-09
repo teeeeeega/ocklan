@@ -23,6 +23,7 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<{ error: AuthError | null }>
   register: (fullName: string, email: string, password: string, intent?: { role: 'COACH' } | { role: 'CLIENT'; coachSlug?: string }) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>
   updateProfile: (values: { full_name: string; avatar_url: string | null }) => Promise<{ error: Error | null }>
+  deleteAccount: () => Promise<{ error: Error | null }>
   logout: () => Promise<{ error: AuthError | null }>
 }
 
@@ -118,6 +119,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }).eq('id', session.user.id)
       if (result.error) return { error: result.error }
       setProfile((current) => current ? { ...current, full_name: fullName, avatar_url: values.avatar_url?.trim() || null } : current)
+      return { error: null }
+    },
+    deleteAccount: async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      const token = currentSession?.access_token
+      if (!token) return { error: new Error('Sessione non disponibile.') }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/rest\/v1\/?$/, '')
+      if (!supabaseUrl) return { error: new Error('Configurazione Supabase mancante.') }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/delete-account`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '' },
+      })
+
+      const body = await response.json().catch(() => null)
+      if (!response.ok) {
+        const message = body?.error ?? 'Impossibile eliminare l\'account.'
+        return { error: new Error(message) }
+      }
+
       return { error: null }
     },
     logout: async () => {
