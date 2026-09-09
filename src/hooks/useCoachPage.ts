@@ -48,7 +48,12 @@ export type CoachPageInput = {
   occupation: string
   bio: string
   avatar_url: string
+  cover_url?: string
+  primary_color?: string
+  cta_label?: string
+  cta_action?: string
   social_links: SocialLinks
+  additional_links?: AdditionalLink[]
   is_published: boolean
   theme?: PublicPageTheme
 }
@@ -162,7 +167,12 @@ export function useCoachPage(enabled: boolean, coachId: string | null) {
       occupation: input.occupation.trim() || null,
       bio: input.bio.trim() || null,
       avatar_url: input.avatar_url.trim() || null,
+      cover_url: input.cover_url?.trim() || null,
+      primary_color: input.primary_color?.trim() || null,
+      cta_label: input.cta_label?.trim() || null,
+      cta_action: input.cta_action?.trim() || null,
       social_links: input.social_links,
+      additional_links: input.additional_links ?? [],
       is_published: input.is_published,
       ...(input.theme ? { theme: input.theme } : !page ? { theme: 'obsidian' } : {}),
     }
@@ -201,7 +211,24 @@ export function useCoachPage(enabled: boolean, coachId: string | null) {
     return { url: data.publicUrl, error: null }
   }
 
-  return { page, loading, error, save, saveTheme, uploadAvatar, refresh: () => setRefreshToken((value) => value + 1) }
+  const uploadCover = async (file: File): Promise<{ url: string | null; error: string | null }> => {
+    if (!coachId) return { url: null, error: 'Coach non disponibile. Effettua nuovamente l\u2019accesso.' }
+    if (!file.type.startsWith('image/')) return { url: null, error: 'Seleziona un\u2019immagine valida.' }
+    if (file.size > 5 * 1024 * 1024) return { url: null, error: 'L\u2019immagine deve essere pi\u00f9 piccola di 5 MB.' }
+
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `${coachId}/cover-${Date.now()}.${extension}`
+    const upload = await supabase.storage.from('coach-avatars').upload(path, file, { upsert: false, contentType: file.type })
+    if (upload.error) return { url: null, error: 'Non \u00e8 stato possibile caricare l\u2019immagine.' }
+
+    const { data } = supabase.storage.from('coach-avatars').getPublicUrl(path)
+    const previousPath = page?.cover_url ? extractStoragePath(page.cover_url) : null
+    if (previousPath) await supabase.storage.from('coach-avatars').remove([previousPath])
+
+    return { url: data.publicUrl, error: null }
+  }
+
+  return { page, loading, error, save, saveTheme, uploadAvatar, uploadCover, refresh: () => setRefreshToken((value) => value + 1) }
 }
 
 function extractStoragePath(publicUrl: string): string | null {

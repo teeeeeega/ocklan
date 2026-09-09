@@ -838,6 +838,7 @@ const SOCIAL_LINK_FIELDS: { key: keyof SocialLinks; label: string; placeholder: 
   { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/tuonome' },
   { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@tuonome' },
   { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@tuonome' },
+  { key: 'website', label: 'Website', placeholder: 'https://tuosito.com' },
 ]
 
 function CoachPageAvatarPicker({ avatarUrl, displayName, onPick, busy }: { avatarUrl: string; displayName: string; onPick: (file: File) => void; busy: boolean }) {
@@ -853,7 +854,7 @@ function CoachPageAvatarPicker({ avatarUrl, displayName, onPick, busy }: { avata
 
 function CoachPageSettings() {
   const { profile, coachId } = useAuth()
-  const { page, loading, error: loadError, save, saveTheme, uploadAvatar, refresh } = useCoachPage(profile?.role === 'COACH', coachId)
+  const { page, loading, error: loadError, save, saveTheme, uploadAvatar, uploadCover, refresh } = useCoachPage(profile?.role === 'COACH', coachId)
   const servicesData = useServices(profile?.role === 'COACH', false, true)
 
   const [displayName, setDisplayName] = useState('')
@@ -862,12 +863,19 @@ function CoachPageSettings() {
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({})
+  const [coverUrl, setCoverUrl] = useState('')
+  const [primaryColor, setPrimaryColor] = useState('')
+  const [ctaLabel, setCtaLabel] = useState('')
+  const [ctaAction, setCtaAction] = useState('')
+  const [additionalLinks, setAdditionalLinks] = useState<AdditionalLink[]>([])
   const [isPublished, setIsPublished] = useState(false)
   const [pageTheme, setPageTheme] = useState<PublicPageTheme>('obsidian')
 
   const [busy, setBusy] = useState(false)
   const [avatarBusy, setAvatarBusy] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [coverBusy, setCoverBusy] = useState(false)
+  const [coverError, setCoverError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [themeBusy, setThemeBusy] = useState(false)
@@ -884,6 +892,11 @@ function CoachPageSettings() {
       setBio(page.bio ?? '')
       setAvatarUrl(page.avatar_url ?? '')
       setSocialLinks(page.social_links)
+      setCoverUrl(page.cover_url ?? '')
+      setPrimaryColor(page.primary_color ?? '')
+      setCtaLabel(page.cta_label ?? '')
+      setCtaAction(page.cta_action ?? '')
+      setAdditionalLinks(page.additional_links ?? [])
       setIsPublished(page.is_published)
       setPageTheme(page.theme)
     } else if (!initialized) {
@@ -910,6 +923,32 @@ function CoachPageSettings() {
     setMessage(null)
   }
 
+  const pickCover = async (file: File) => {
+    if (coverBusy) return
+    setCoverBusy(true)
+    setCoverError(null)
+    const result = await uploadCover(file)
+    setCoverBusy(false)
+    if (result.error || !result.url) {
+      setCoverError(result.error ?? 'Non \u00e8 stato possibile caricare l\u2019immagine.')
+      return
+    }
+    setCoverUrl(result.url)
+    setMessage(null)
+  }
+
+  const addAdditionalLink = () => {
+    setAdditionalLinks((current) => [...current, { title: '', url: '' }])
+  }
+
+  const updateAdditionalLink = (index: number, field: 'title' | 'url', value: string) => {
+    setAdditionalLinks((current) => current.map((link, i) => i === index ? { ...link, [field]: value } : link))
+  }
+
+  const removeAdditionalLink = (index: number) => {
+    setAdditionalLinks((current) => current.filter((_, i) => i !== index))
+  }
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
@@ -922,7 +961,12 @@ function CoachPageSettings() {
       occupation,
       bio,
       avatar_url: avatarUrl,
+      cover_url: coverUrl,
+      primary_color: primaryColor,
+      cta_label: ctaLabel,
+      cta_action: ctaAction,
       social_links: socialLinks,
+      additional_links: additionalLinks,
       is_published: isPublished,
       theme: pageTheme,
     })
@@ -977,6 +1021,16 @@ function CoachPageSettings() {
             </button>)}
           </div>
           {themeError && <p className="form-error" role="alert">{themeError}</p>}
+          <label>Colore primario<input type="color" value={primaryColor || '#e0342f'} onChange={(event) => setPrimaryColor(event.target.value)} /></label>
+        </section>
+
+        <section className="panel">
+          <div className="panel-heading"><div><span className="eyebrow">Copertina</span><h2>Immagine di copertina</h2></div></div>
+          {coverUrl && <img src={coverUrl} alt="Copertina" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, marginBottom: 12 }} />}
+          <label className="ghost-button" style={{ display: 'inline-flex', cursor: 'pointer' }}>{coverBusy ? 'Caricamento...' : 'Carica copertina'}<input type="file" accept="image/*" hidden disabled={coverBusy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void pickCover(file); event.target.value = '' }} /></label>
+          {coverUrl && <button type="button" className="text-button" onClick={() => setCoverUrl('')} style={{ marginLeft: 8 }}>Rimuovi</button>}
+          {coverError && <p className="form-error" role="alert">{coverError}</p>}
+          <small className="muted">JPG, PNG o WEBP \u00b7 massimo 5 MB</small>
         </section>
 
         <section className="panel">
@@ -992,10 +1046,26 @@ function CoachPageSettings() {
         </section>
 
         <section className="panel">
+          <div className="panel-heading"><div><span className="eyebrow">Call to Action</span><h2>Pulsante personalizzato</h2></div></div>
+          <label>Testo del pulsante<input value={ctaLabel} onChange={(event) => setCtaLabel(event.target.value)} placeholder="es. Prenota una call" /></label>
+          <label>Azione (URL)<input value={ctaAction} onChange={(event) => setCtaAction(event.target.value)} placeholder="es. https://calendly.com/tuonome" /></label>
+        </section>
+
+        <section className="panel">
           <div className="panel-heading"><div><span className="eyebrow">Social</span><h2>Profili social</h2></div></div>
           <div className="exercise-form-grid">
             {SOCIAL_LINK_FIELDS.map((field) => <label key={field.key}>{field.label}<input value={socialLinks[field.key] ?? ''} onChange={(event) => updateSocialLink(field.key, event.target.value)} placeholder={field.placeholder} /></label>)}
           </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-heading"><div><span className="eyebrow">Link aggiuntivi</span><h2>Link utili</h2></div><button type="button" className="ghost-button compact" onClick={addAdditionalLink}><Plus size={15} /> Aggiungi</button></div>
+          {additionalLinks.length === 0 && <p className="muted">Nessun link aggiuntivo. Aggiungi link a risorse esterne come PDF, video o documenti.</p>}
+          {additionalLinks.map((link, index) => <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+            <input value={link.title} onChange={(event) => updateAdditionalLink(index, 'title', event.target.value)} placeholder="Titolo" style={{ flex: 1 }} />
+            <input value={link.url} onChange={(event) => updateAdditionalLink(index, 'url', event.target.value)} placeholder="https://..." style={{ flex: 2 }} />
+            <button type="button" className="icon-button" onClick={() => removeAdditionalLink(index)} aria-label="Rimuovi link"><Trash2 size={15} /></button>
+          </div>)}
         </section>
 
         <section className="panel">
